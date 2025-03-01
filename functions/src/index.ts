@@ -75,9 +75,8 @@ const createCustomerRecord = async ({
     const customerRecord = {
       email: customer.email,
       stripeId: customer.id,
-      stripeLink: `https://dashboard.stripe.com${
-        customer.livemode ? '' : '/test'
-      }/customers/${customer.id}`,
+      stripeLink: `https://dashboard.stripe.com${customer.livemode ? '' : '/test'
+        }/customers/${customer.id}`,
     };
     if (phone) (customerRecord as any).phone = phone;
     await admin
@@ -170,15 +169,15 @@ exports.createCheckoutSession = functions
         const shippingCountries: Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[] =
           collect_shipping_address
             ? (
-                await admin
-                  .firestore()
-                  .collection(
-                    config.stripeConfigCollectionPath ||
-                      config.productsCollectionPath
-                  )
-                  .doc('shipping_countries')
-                  .get()
-              ).data()?.['allowed_countries'] ?? []
+              await admin
+                .firestore()
+                .collection(
+                  config.stripeConfigCollectionPath ||
+                  config.productsCollectionPath
+                )
+                .doc('shipping_countries')
+                .get()
+            ).data()?.['allowed_countries'] ?? []
             : [];
         const sessionCreateParams: Stripe.Checkout.SessionCreateParams = {
           billing_address_collection,
@@ -189,11 +188,11 @@ exports.createCheckoutSession = functions
           line_items: line_items
             ? line_items
             : [
-                {
-                  price,
-                  quantity,
-                },
-              ],
+              {
+                price,
+                quantity,
+              },
+            ],
           mode,
           success_url,
           cancel_url,
@@ -563,9 +562,8 @@ const manageSubscriptionStatusChange = async (
     metadata: subscription.metadata,
     role,
     status: subscription.status,
-    stripeLink: `https://dashboard.stripe.com${
-      subscription.livemode ? '' : '/test'
-    }/subscriptions/${subscription.id}`,
+    stripeLink: `https://dashboard.stripe.com${subscription.livemode ? '' : '/test'
+      }/subscriptions/${subscription.id}`,
     product: admin
       .firestore()
       .collection(config.productsCollectionPath)

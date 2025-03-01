@@ -36,8 +36,7 @@ export const customerDeletionError = (error: Error, uid: string) => {
 
 export function customerCreated(id: string, livemode: boolean) {
   logger.log(
-    `✅Created a new customer: https://dashboard.stripe.com${
-      livemode ? '' : '/test'
+    `✅Created a new customer: https://dashboard.stripe.com${livemode ? '' : '/test'
     }/customers/${id}.`
   );
 }

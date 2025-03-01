@@ -129,14 +129,14 @@ export interface Subscription {
    * The status of the subscription object
    */
   status:
-    | 'active'
-    | 'canceled'
-    | 'incomplete'
-    | 'incomplete_expired'
-    | 'past_due'
-    | 'paused'
-    | 'trialing'
-    | 'unpaid';
+  | 'active'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'past_due'
+  | 'paused'
+  | 'trialing'
+  | 'unpaid';
   /**
    * If true the subscription has been canceled by the user and will be deleted at the end of the billing period.
    */
