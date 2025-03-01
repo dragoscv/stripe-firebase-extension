@@ -8,7 +8,7 @@
  */
 
 // import { onRequest } from "firebase-functions/v2/https";
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 // import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 // import { onCustomEventPublished } from "firebase-functions/v2/eventarc";
@@ -53,171 +53,10 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
-exports.onLicitatieCreated = functions.region("europe-west1").firestore
-    .document("licitatii/{licitatieId}")
-    .onCreate(async (snap, context) => {
-        const data = snap.data();
-        console.log(data);
-        //update statistics
-
-        try {
-            await admin.firestore().collection("statistics").doc("licitatii").update({
-                totalCount: admin.firestore.FieldValue.increment(1),
-                activeCount: admin.firestore.FieldValue.increment(data.status === "active" ? 1 : 0)
-            });
-        } catch (error) {
-            console.error(error);
-            await admin.firestore().collection("statistics").doc("licitatii").set({
-                totalCount: 1,
-                activeCount: data.status === "active" ? 1 : 0
-            });
-        }
-    });
-
-exports.onLicitatieDeleted = functions.region("europe-west1").firestore
-    .document("licitatii/{licitatieId}")
-    .onDelete(async (snap, context) => {
-        // const data = snap.data();
-        // console.log(data);
-        //update statistics
-
-        try {
-            await admin.firestore().collection("statistics").doc("licitatii").update({
-                totalCount: admin.firestore.FieldValue.increment(-1),
-                activeCount: admin.firestore.FieldValue.increment(-1)
-            });
-        } catch (error) {
-            console.error(error);
-            await admin.firestore().collection("statistics").doc("licitatii").set({
-                totalCount: 0,
-                activeCount: 0
-            });
-        }
-    });
-
-exports.onLicitatieStatusUpdated = functions.region("europe-west1").firestore
-    .document("licitatii/{licitatieId}")
-    .onUpdate(async (change, context) => {
-        const data = change.after.data();
-        console.log(data);
-        //update statistics
-
-        if (data.status !== "active") {
-            try {
-                await admin.firestore().collection("statistics").doc("licitatii").update({
-                    activeCount: admin.firestore.FieldValue.increment(-1)
-                });
-            } catch (error) {
-                console.error(error);
-                await admin.firestore().collection("statistics").doc("licitatii").set({
-                    activeCount: 0
-                });
-            }
-        }
-
-    });
 
 
-exports.onServiciuCreated = functions.region("europe-west1").firestore
-    .document("servicii/{serviciuId}")
-    .onCreate(async (snap, context) => {
-        // const data = snap.data();
-        // console.log(data);
-        //update statistics
 
-        try {
-            await admin.firestore().collection("statistics").doc("servicii").update({
-                totalCount: admin.firestore.FieldValue.increment(1)
-            });
-        } catch (error) {
-            console.error(error);
-            await admin.firestore().collection("statistics").doc("servicii").set({
-                totalCount: 1
-            });
-        }
-    });
-
-exports.onServiciuDeleted = functions.region("europe-west1").firestore
-    .document("servicii/{serviciuId}")
-    .onDelete(async (snap, context) => {
-        // const data = snap.data();
-        // console.log(data);
-        //update statistics
-
-        try {
-            await admin.firestore().collection("statistics").doc("servicii").update({
-                totalCount: admin.firestore.FieldValue.increment(-1)
-            });
-        } catch (error) {
-            console.error(error);
-            await admin.firestore().collection("statistics").doc("servicii").set({
-                totalCount: 0
-            });
-        }
-    });
-
-exports.onServiciuStatusUpdated = functions.region("europe-west1").firestore
-    .document("servicii/{serviciuId}")
-    .onUpdate(async (change, context) => {
-        const data = change.after.data();
-        console.log(data);
-        //update statistics
-
-        if (data.status !== "active") {
-            try {
-                await admin.firestore().collection("statistics").doc("servicii").update({
-                    activeCount: admin.firestore.FieldValue.increment(-1)
-                });
-            } catch (error) {
-                console.error(error);
-                await admin.firestore().collection("statistics").doc("servicii").set({
-                    activeCount: 0
-                });
-            }
-        }
-
-    });
-
-exports.onFurnizorCreated = functions.region("europe-west1").firestore
-    .document("furnizori/{furnizorId}")
-    .onCreate(async (snap, context) => {
-        // const data = snap.data();
-        // console.log(data);
-        //update statistics
-
-        try {
-            await admin.firestore().collection("statistics").doc("furnizori").update({
-                totalCount: admin.firestore.FieldValue.increment(1)
-            });
-        } catch (error) {
-            console.error(error);
-            await admin.firestore().collection("statistics").doc("furnizori").set({
-                totalCount: 1
-            });
-        }
-    });
-
-exports.onFurnizorDeleted = functions.region("europe-west1").firestore
-    .document("furnizori/{furnizorId}")
-    .onDelete(async (snap, context) => {
-        // const data = snap.data();
-        // console.log(data);
-        //update statistics
-
-        try {
-            await admin.firestore().collection("statistics").doc("furnizori").update({
-                totalCount: admin.firestore.FieldValue.increment(-1)
-            });
-        } catch (error) {
-            console.error(error);
-            await admin.firestore().collection("statistics").doc("furnizori").set({
-                totalCount: 0
-            });
-        }
-    });
-
-
-exports.onOfferCreated = functions.region("europe-west1").firestore
+export const onOfferCreated = functions.region("europe-west1").firestore
     .document("licitatii/{licitatieId}/oferte/{offerId}")
     .onCreate(async (snap, context) => {
         const data = snap.data();

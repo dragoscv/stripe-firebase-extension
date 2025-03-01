@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions";
+import * as functionsV1 from "firebase-functions/v1";
 // import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 if (admin.apps.length === 0) {
@@ -11,8 +12,7 @@ export interface Notification {
     body: string;
     data: { [key: string]: string };
 }
-
-export const sendPushNotification = async (notificationData: Notification, context: functions.https.CallableContext) => {
+export const sendPushNotification = async (notificationData: Notification, context: functionsV1.https.CallableContext) => {
     const { tokens, title, body, data } = notificationData;
 
     const payload = {

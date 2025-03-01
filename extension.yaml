@@ -30,14 +30,14 @@ sourceUrl: https://github.com/stripe/stripe-firebase-extensions/tree/master/fire
 releaseNotesUrl: https://github.com/stripe/stripe-firebase-extensions/tree/master/firestore-stripe-payments/CHANGELOG.md
 
 author:
-  authorName: Invertase
-  url: https://invertase.io
+  authorName: Dragos Catalin
+  url: https://dragoscatalin.ro
 
-contributors:
-  - authorName: Thorsten Schaeff
-    url: https://twitter.com/thorwebdev
-  - authorName: Firebase
-    url: https://firebase.google.com
+# contributors:
+#   - authorName: Thorsten Schaeff
+#     url: https://twitter.com/thorwebdev
+#   - authorName: Firebase
+#     url: https://firebase.google.com
 
 billingRequired: true # this extension makes requests to a third party API (Stripe)
 
@@ -173,7 +173,7 @@ params:
         value: southamerica-east1
       - label: Sydney (australia-southeast1)
         value: australia-southeast1
-    default: us-central1
+    default: europe-west1
     required: true
     immutable: true
 
@@ -304,8 +304,7 @@ events:
       Occurs when a payment intent using a delayed payment method finally
       succeeds.
   - type: com.stripe.v1.checkout.session.async_payment_failed
-    description:
-      Occurs when a payment intent using a delayed payment method fails.
+    description: Occurs when a payment intent using a delayed payment method fails.
   - type: com.stripe.v1.customer.subscription.created
     description: Occurs whenever a customer is signed up for a new plan.
   - type: com.stripe.v1.customer.subscription.updated

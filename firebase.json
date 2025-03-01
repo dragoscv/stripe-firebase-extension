@@ -31,7 +31,7 @@
   },
   "functions": [
     {
-      "source": "../functions/lib",
+      "source": "functions",
       "codebase": "default",
       "ignore": [
         "node_modules",
