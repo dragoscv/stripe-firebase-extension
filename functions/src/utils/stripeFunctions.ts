@@ -7,17 +7,17 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-// import { onRequest } from "firebase-functions/v2/https";
-import { getEventarc } from 'firebase-admin/eventarc';
-import * as functionsV2 from "firebase-functions";
+import { onCall } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
 import * as functions from "firebase-functions/v1";
-import * as functionsV1 from 'firebase-functions/v1';
-// import * as logger from "firebase-functions/logger";
-import * as admin from "firebase-admin";
 import { onCustomEventPublished } from "firebase-functions/v2/eventarc";
+import { onDocumentCreated, onDocumentDeleted } from "firebase-functions/v2/firestore";
+
+
+import * as admin from "firebase-admin";
+import { getEventarc } from 'firebase-admin/eventarc';
 import { Timestamp } from 'firebase-admin/firestore';
 
-// import { getEventarc } from 'firebase-admin/eventarc';
 import Stripe from 'stripe';
 import {
     Product,
@@ -28,7 +28,6 @@ import {
 } from '../interfaces';
 import * as logs from '../logs';
 import config from '../config';
-// import { Timestamp } from 'firebase-admin/firestore';
 
 const apiVersion = '2025-02-24.acacia';
 
@@ -41,16 +40,6 @@ const stripe = new Stripe(config.stripeSecretKey || 'fallback_key_here', {
         version: '0.3.5',
     },
 });
-
-
-// Start writing functions
-// https://firebase.google.com/docs/functions/typescript
-
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
-
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -109,29 +98,36 @@ const createCustomerRecord = async ({
     }
 };
 
-export const createCustomer = functionsV1.auth
-    .user()
-    .onCreate(async (user): Promise<void> => {
+export const createCustomer = onCall(
+    { region: config.region || 'europe-west1' },
+    async (event): Promise<void> => {
         if (!config.syncUsersOnCreate) return;
-        const { email, uid, phoneNumber } = user;
+        const { email, uid, phoneNumber } = event.data;
         await createCustomerRecord({
             email,
             uid,
             phone: phoneNumber,
         });
-    });
+    }
+);
 
 /**
  * Create a CheckoutSession or PaymentIntent based on which client is being used.
  */
-export const createCheckoutSession = functionsV1
-    .runWith({
+export const createCheckoutSession = onDocumentCreated(
+    {
+        region: config.region || 'europe-west1',
+        document: `/${config.customersCollectionPath}/{uid}/checkout_sessions/{id}`,
         minInstances: config.minCheckoutInstances,
-    })
-    .firestore.document(
-        `/${config.customersCollectionPath}/{uid}/checkout_sessions/{id}`
-    )
-    .onCreate(async (snap, context) => {
+    },
+    async (event) => {
+        const snap = event.data;
+        if (!snap) {
+            console.error('No data associated with the event');
+            return;
+        }
+        const context = { params: event.params };
+
         const {
             client = 'web',
             amount,
@@ -165,6 +161,7 @@ export const createCheckoutSession = functionsV1
             phone_number_collection = {},
             payment_method_collection = 'always',
         } = snap.data();
+
         try {
             logs.creatingCheckoutSession(context.params.id);
             // Get stripe customer id
@@ -376,15 +373,17 @@ export const createCheckoutSession = functionsV1
                 { merge: true }
             );
         }
-    });
+    }
+);
 
 /**
  * Create a billing portal link
  */
-export const createPortalLink = functionsV1.https.onCall(
-    async (data, context) => {
+export const createPortalLink = onCall(
+    { region: config.region || 'europe-west1' },
+    async (request) => {
         // Checking that the user is authenticated.
-        const uid = context.auth?.uid;
+        const uid = request.auth?.uid;
         if (!uid) {
             // Throwing an HttpsError so that the client gets the error details.
             throw new functions.https.HttpsError(
@@ -392,13 +391,14 @@ export const createPortalLink = functionsV1.https.onCall(
                 'The function must be called while authenticated!'
             );
         }
+
         try {
             const {
                 returnUrl: return_url,
                 locale = 'auto',
                 configuration,
                 flow_data,
-            } = data;
+            } = request.data;
 
             // Get stripe customer id
             let customerRecord = (
@@ -789,8 +789,9 @@ const insertPaymentRecord = async (
 /**
  * A webhook handler function for the relevant Stripe events.
  */
-export const handleWebhookEvents = functionsV1.https.onRequest(
-    async (req: functionsV1.https.Request, resp) => {
+export const handleWebhookEvents = onRequest(
+    { region: config.region || 'europe-west1' },
+    async (req, resp) => {
         const relevantEvents = new Set([
             'product.created',
             'product.updated',
@@ -1009,41 +1010,61 @@ const deleteStripeCustomer = async ({
 
 /*
  * The `onUserDeleted` deletes their customer object in Stripe which immediately cancels all their subscriptions.
-export const onUserDeleted = functionsV1.auth.user().onDelete(async (user) => {
-export const onUserDeleted = functions.auth.user().onDelete(async (user) => {
-  if (!config.autoDeleteUsers) return;
-  // Get the Stripe customer id.
-  const customer = (
-    await admin
-      .firestore()
-      .collection(config.customersCollectionPath)
-      .doc(user.uid)
-      .get()
-  ).data();
-  // If you use the `delete-user-data` extension it could be the case that the customer record is already deleted.
-  // In that case, the `onCustomerDataDeleted` function below takes care of deleting the Stripe customer object.
-  if (customer) {
-    await deleteStripeCustomer({ uid: user.uid, stripeId: customer.stripeId });
-  }
-});
+ */
+export const onUserDeletedFunction = onCall(
+    { region: config.region || 'europe-west1' },
+    async (event: {
+        data: {
+            uid: string;
+            email?: string;
+            displayName?: string;
+            photoURL?: string;
+            phoneNumber?: string;
+        }
+    }) => {
+        if (!config.autoDeleteUsers) return;
+        // Get the Stripe customer id.
+        const customer = (
+            await admin
+                .firestore()
+                .collection(config.customersCollectionPath || 'customers')
+                .doc(event.data.uid)
+                .get()
+        ).data() as { stripeId: string } | undefined;
+        // If you use the `delete-user-data` extension it could be the case that the customer record is already deleted.
+        // In that case, the `onCustomerDataDeleted` function below takes care of deleting the Stripe customer object.
+        if (customer) {
+            await deleteStripeCustomer({ uid: event.data.uid, stripeId: customer.stripeId });
+        }
+    }
+);
 
 /*
  * The `onCustomerDataDeleted` deletes their customer object in Stripe which immediately cancels all their subscriptions.
  */
-export const onCustomerDataDeleted = functionsV1.firestore
-    .document(`/${config.customersCollectionPath}/{uid}`)
-    .onDelete(async (snap, context) => {
+export const onCustomerDataDeleted = onDocumentDeleted(
+    {
+        region: config.region || 'europe-west1',
+        document: `/${config.customersCollectionPath}/{uid}`
+    },
+    async (event) => {
         if (!config.autoDeleteUsers) return;
-        const { stripeId } = snap.data();
-        await deleteStripeCustomer({ uid: context.params.uid, stripeId });
-    });
-
-
+        if (!event.data) {
+            console.log("No data associated with the event");
+            return;
+        }
+        const { stripeId } = event.data.data();
+        await deleteStripeCustomer({ uid: event.params.uid, stripeId });
+    }
+);
 
 //##############################################################
 //my stripe functions
 export const handleInvoicePaymentSucceeded = onCustomEventPublished(
-    "com.stripe.v1.invoice.payment_succeeded",
+    {
+        eventType: "com.stripe.v1.invoice.payment_succeeded",
+        region: config.region || 'europe-west1',
+    },
     async (event) => {
         const invoice = event.data;
         console.log('invoice payment succeeded received', invoice.id);
@@ -1147,74 +1168,86 @@ export const handleInvoicePaymentSucceeded = onCustomEventPublished(
             console.error('Customer ID not found in invoice');
         }
 
-    });
+    }
+);
 
-export const onCustomerCreated = functions.region('europe-west1').firestore
-    .document('customers/{customerId}')
-    .onCreate(async (snap, context) => {
-
-        admin.firestore().collection('stats').doc('customers').update({
+export const onCustomerCreated = onDocumentCreated(
+    {
+        region: config.region || 'europe-west1',
+        document: 'customers/{customerId}'
+    },
+    async (event) => {
+        await admin.firestore().collection('stats').doc('customers').update({
             customersCount: admin.firestore.FieldValue.increment(1)
         });
+    }
+);
 
-    });
-
-export const onCustomerDeleted = functions.region('europe-west1').firestore
-    .document('customers/{customerId}')
-    .onDelete(async (snap, context) => {
-
-        admin.firestore().collection('stats').doc('customers').update({
+export const onCustomerDeleted = onDocumentDeleted(
+    {
+        region: config.region || 'europe-west1',
+        document: 'customers/{customerId}'
+    },
+    async (event) => {
+        await admin.firestore().collection('stats').doc('customers').update({
             customersCount: admin.firestore.FieldValue.increment(-1)
         });
+    }
+);
 
-    });
-
-export const onCustomerSubscriptionCreated = functions.region('europe-west1').firestore
-    .document('customers/{customerId}/subscriptions/{subscriptionId}')
-    .onCreate(async (snap, context) => {
-        const docData = snap.data();
+export const onCustomerSubscriptionCreated = onDocumentCreated(
+    {
+        region: config.region || 'europe-west1',
+        document: 'customers/{customerId}/subscriptions/{subscriptionId}'
+    },
+    async (event) => {
+        if (!event.data) return;
+        const docData = event.data.data();
         console.log(docData.status);
         if (docData.status === 'active' || docData.status === 'trialing') {
             console.log('incrementing');
-            admin.firestore().collection('stats').doc('customers').update({
+            await admin.firestore().collection('stats').doc('customers').update({
                 subscribedCustomersCount: admin.firestore.FieldValue.increment(1)
             });
         } else {
             console.log('not incrementing');
         }
-
-    });
-
-export const cancelSubscription = functions.https.onCall(async (data, context) => {
-    const { subscriptionId, customerId } = data;
-
-    // Checking that the user is authenticated.
-    const uid = context.auth?.uid;
-    if (!uid) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError(
-            "unauthenticated",
-            "The function must be called while authenticated!"
-        );
     }
+);
 
-    try {
-        // Step 1: Retrieve the subscription from Stripe
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+export const cancelSubscription = onCall(
+    { region: config.region || 'europe-west1' },
+    async (request) => {
+        const { subscriptionId, customerId } = request.data;
 
-        // Step 2: Check if the subscription's customerId matches the provided customerId
-        if (subscription.customer !== customerId) {
+        // Checking that the user is authenticated.
+        const uid = request.auth?.uid;
+        if (!uid) {
+            // Throwing an HttpsError so that the client gets the error details.
             throw new functions.https.HttpsError(
-                "permission-denied",
-                "The subscription does not belong to the provided customer."
+                "unauthenticated",
+                "The function must be called while authenticated!"
             );
         }
 
-        // Step 3: Cancel the subscription if the customerId matches
-        const canceledSubscription = await stripe.subscriptions.cancel(subscriptionId);
+        try {
+            // Step 1: Retrieve the subscription from Stripe
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-        return canceledSubscription;
-    } catch (error: any) {
-        throw new functions.https.HttpsError("internal", error.message);
+            // Step 2: Check if the subscription's customerId matches the provided customerId
+            if (subscription.customer !== customerId) {
+                throw new functions.https.HttpsError(
+                    "permission-denied",
+                    "The subscription does not belong to the provided customer."
+                );
+            }
+
+            // Step 3: Cancel the subscription if the customerId matches
+            const canceledSubscription = await stripe.subscriptions.cancel(subscriptionId);
+
+            return canceledSubscription;
+        } catch (error: any) {
+            throw new functions.https.HttpsError("internal", error.message);
+        }
     }
-});
+);

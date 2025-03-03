@@ -23,15 +23,17 @@ export const sendPushNotification = async (notificationData: Notification, conte
         data,
     };
 
-    admin.messaging().sendEachForMulticast({
+    return admin.messaging().sendEachForMulticast({
         tokens: tokens,
         notification: payload.notification,
         data: payload.data
     })
         .then((response) => {
             console.log('Successfully sent message:', response);
+            return response;
         })
         .catch((error) => {
             console.error('Error sending message:', error);
+            throw error;
         });
 };

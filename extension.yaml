@@ -13,7 +13,7 @@
 # limitations under the License.
 
 name: firestore-stripe-payments
-version: 0.3.9
+version: 0.4.0
 specVersion: v1beta
 
 displayName: Run Payments with Stripe
@@ -33,17 +33,13 @@ author:
   authorName: Dragos Catalin
   url: https://dragoscatalin.ro
 
-# contributors:
-#   - authorName: Thorsten Schaeff
-#     url: https://twitter.com/thorwebdev
-#   - authorName: Firebase
-#     url: https://firebase.google.com
-
 billingRequired: true # this extension makes requests to a third party API (Stripe)
 
 externalServices:
   - name: Stripe
     pricingUri: https://stripe.com/pricing
+  - name: Brevo
+    pricingUri: https://www.brevo.com/pricing/
 
 roles:
   - role: firebaseauth.admin
@@ -120,6 +116,70 @@ resources:
       eventTrigger:
         eventType: providers/cloud.firestore/eventTypes/document.delete
         resource: projects/${PROJECT_ID}/databases/(default)/documents/${CUSTOMERS_COLLECTION}/{uid}
+
+  - name: handleInvoicePaymentSucceeded
+    type: firebaseextensions.v1beta.function
+    description: >-
+      Updates earnings statistics and affiliate rewards when an invoice is successfully paid.
+    properties:
+      location: ${LOCATION}
+      runtime: nodejs18
+      eventTrigger:
+        eventType: com.stripe.v1.invoice.payment_succeeded
+        resource: projects/${PROJECT_ID}
+
+  - name: onCustomerCreated
+    type: firebaseextensions.v1beta.function
+    description: >-
+      Updates customer statistics when a new customer is created.
+    properties:
+      location: ${LOCATION}
+      runtime: nodejs18
+      eventTrigger:
+        eventType: providers/cloud.firestore/eventTypes/document.create
+        resource: projects/${PROJECT_ID}/databases/(default)/documents/customers/{customerId}
+
+  - name: onCustomerDeleted
+    type: firebaseextensions.v1beta.function
+    description: >-
+      Updates customer statistics when a customer is deleted.
+    properties:
+      location: ${LOCATION}
+      runtime: nodejs18
+      eventTrigger:
+        eventType: providers/cloud.firestore/eventTypes/document.delete
+        resource: projects/${PROJECT_ID}/databases/(default)/documents/customers/{customerId}
+
+  - name: onCustomerSubscriptionCreated
+    type: firebaseextensions.v1beta.function
+    description: >-
+      Updates subscription statistics when a customer subscribes to a plan.
+    properties:
+      location: ${LOCATION}
+      runtime: nodejs18
+      eventTrigger:
+        eventType: providers/cloud.firestore/eventTypes/document.create
+        resource: projects/${PROJECT_ID}/databases/(default)/documents/customers/{customerId}/subscriptions/{subscriptionId}
+
+  - name: cancelSubscription
+    type: firebaseextensions.v1beta.function
+    description: >-
+      Allows customers to cancel their subscriptions.
+    properties:
+      location: ${LOCATION}
+      runtime: nodejs18
+      httpsTrigger: {}
+
+  - name: onOfferCreated
+    type: firebaseextensions.v1beta.function
+    description: >-
+      Updates statistics and sends notifications when a new offer is created.
+    properties:
+      location: ${LOCATION}
+      runtime: nodejs18
+      eventTrigger:
+        eventType: providers/cloud.firestore/eventTypes/document.create
+        resource: projects/${PROJECT_ID}/databases/(default)/documents/licitatii/{licitatieId}/oferte/{offerId}
 
 params:
   - param: LOCATION
